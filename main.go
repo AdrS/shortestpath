@@ -13,14 +13,24 @@ import (
 	"net/http"
 )
 
-func drawMap(out io.Writer) {
-	width := 100
-	height := 100
-	img := image.NewRGBA(image.Rect(0, 0, width, height))
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			img.Set(x, y, color.RGBA{0, 0, 255, 255})
+func drawMap(out io.Writer, centerx, centery, radius, size int) {
+	img := image.NewRGBA(image.Rect(0, 0, size, size))
+	for y := 0; y < size; y++ {
+		for x := 0; x < size; x++ {
+			img.Set(x, y, color.RGBA{255, 255, 255, 255})
 		}
+	}
+	minLat := centery - radius
+	maxLat := centery + radius
+	minLong := centerx - radius
+	maxLong := centerx + radius
+	for _, cord := range roadNetwork.Nodes {
+		if cord.Lat < minLat || cord.Lat > maxLat || cord.Long < minLong || cord.Long > maxLong {
+			continue
+		}
+		x := int(float64((cord.Long-minLong)*size) / float64(2*radius))
+		y := int(float64((cord.Lat-minLat)*size) / float64(2*radius))
+		img.Set(x, size-y, color.RGBA{128, 128, 128, 255})
 	}
 	png.Encode(out, img)
 }
@@ -37,10 +47,53 @@ func setup() {
 	roadNetwork = g
 }
 
+// Parses integer, ensuring result is in [min, max]
+// Provides default value of s is not an integer
+func parseInt(s string, min, max, defaultValue int) int {
+	x, err := strconv.Atoi(s)
+	if err != nil {
+		x = defaultValue
+	}
+	if x < min {
+		x = min
+	}
+	if x > max {
+		x = max
+	}
+	return x
+}
+
+// takes part of a lat long cordinate and parses it
+func parseCordPart(s string, min, max, defaultValue float64) int {
+	x, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		x = defaultValue
+	}
+	if x < min {
+		x = min
+	}
+	if x > max {
+		x = max
+	}
+	return int(x * 1e6)
+}
+
+// 42.1 N -98 W -> Cord{42100000, -98000000}
+//func parseCord(s string) graph.Cord {
+//}
+
 func main() {
 	setup()
 	http.HandleFunc("/map", func(w http.ResponseWriter, r *http.Request) {
-		drawMap(w)
+		centerx := parseCordPart(r.FormValue("centerx"), -180, 180, -85)
+		log.Println(r.FormValue("centerx"), centerx)
+		centery := parseCordPart(r.FormValue("centery"), -180, 180, 44)
+		log.Println(r.FormValue("centery"), centery)
+		radius := parseCordPart(r.FormValue("radius"), 0.01, 90, 5)
+		log.Println(r.FormValue("radius"), radius)
+		size := parseInt(r.FormValue("size"), 24, 2000, 400)
+		log.Println(r.FormValue("size"), size)
+		drawMap(w, centerx, centery, radius, size)
 	})
 	http.HandleFunc("/vertex", func(w http.ResponseWriter, r *http.Request) {
 		i, err := strconv.Atoi(r.FormValue("i"))

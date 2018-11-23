@@ -10,10 +10,21 @@ import (
 	"github.com/adrs/shortestpath/graph"
 	"image/png"
 	"log"
+	"math/rand"
 	"net/http"
 )
 
-func drawMap(out io.Writer, centerx, centery, radius, size int) {
+func inRange(cord graph.Cord, minLat, maxLat, minLong, maxLong int) bool {
+	return cord.Lat >= minLat && cord.Lat <= maxLat && cord.Long >= minLong && cord.Long <= maxLong
+}
+
+func pixelLocation(cord graph.Cord, minLat, minLong, radius, size int) (x, y int) {
+	x = int(float64((cord.Long-minLong)*size) / float64(2*radius))
+	y = int(float64((cord.Lat-minLat)*size) / float64(2*radius))
+	return
+}
+
+func makeMap(centerx, centery, radius, size int) *image.RGBA {
 	img := image.NewRGBA(image.Rect(0, 0, size, size))
 	for y := 0; y < size; y++ {
 		for x := 0; x < size; x++ {
@@ -25,14 +36,70 @@ func drawMap(out io.Writer, centerx, centery, radius, size int) {
 	minLong := centerx - radius
 	maxLong := centerx + radius
 	for _, cord := range roadNetwork.Nodes {
-		if cord.Lat < minLat || cord.Lat > maxLat || cord.Long < minLong || cord.Long > maxLong {
+		if !inRange(cord, minLat, maxLat, minLong, maxLong) {
 			continue
 		}
-		x := int(float64((cord.Long-minLong)*size) / float64(2*radius))
-		y := int(float64((cord.Lat-minLat)*size) / float64(2*radius))
+		x, y := pixelLocation(cord, minLat, minLong, radius, size)
 		img.Set(x, size-y, color.RGBA{128, 128, 128, 255})
 	}
-	png.Encode(out, img)
+	return img
+}
+
+func drawMap(out io.Writer, centerx, centery, radius, size int) {
+	png.Encode(out, makeMap(centerx, centery, radius, size))
+}
+
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func drawShortestPath(out io.Writer, src, dest, size int) {
+	// TODO: validate src and dest
+	shortestPath, searchSeq := graph.SearchSequence(roadNetwork, src, dest)
+
+	// TODO: determine bounds from search sequence
+	centerx := (roadNetwork.Nodes[src].Long + roadNetwork.Nodes[dest].Long) / 2
+	centery := (roadNetwork.Nodes[src].Lat + roadNetwork.Nodes[dest].Lat) / 2
+	dx := abs(roadNetwork.Nodes[src].Long - roadNetwork.Nodes[dest].Long)
+	dy := abs(roadNetwork.Nodes[src].Lat - roadNetwork.Nodes[dest].Lat)
+	radius := max(max(dx, dy)*3/2, 1e5)
+	minLat := centery - radius
+	maxLat := centery + radius
+	minLong := centerx - radius
+	maxLong := centerx + radius
+
+	baseMap := makeMap(centerx, centery, radius, size)
+	// Show search sequence
+	for _, v := range searchSeq {
+		cord := roadNetwork.Nodes[v]
+		if !inRange(cord, minLat, maxLat, minLong, maxLong) {
+			continue
+		}
+		x, y := pixelLocation(cord, minLat, minLong, radius, size)
+		// TODO: parameterize colors
+		baseMap.Set(x, size-y, color.RGBA{128, 255, 128, 255})
+	}
+
+	// Show shortest path
+	for _, v := range shortestPath {
+		cord := roadNetwork.Nodes[v]
+		if !inRange(cord, minLat, maxLat, minLong, maxLong) {
+			continue
+		}
+		x, y := pixelLocation(cord, minLat, minLong, radius, size)
+		baseMap.Set(x, size-y, color.RGBA{255, 0, 128, 255})
+	}
+	png.Encode(out, baseMap)
 }
 
 var roadNetwork *graph.Graph
@@ -67,7 +134,7 @@ func parseInt(s string, min, max, defaultValue int) int {
 func parseCordPart(s string, min, max, defaultValue float64) int {
 	x, err := strconv.ParseFloat(s, 64)
 	if err != nil {
-		x = defaultValue
+		return int(defaultValue * 1e6)
 	}
 	if x < min {
 		x = min
@@ -79,6 +146,7 @@ func parseCordPart(s string, min, max, defaultValue float64) int {
 }
 
 func main() {
+	rand.Seed(42)
 	setup()
 	http.Handle("/", http.FileServer(http.Dir("static")))
 	http.HandleFunc("/map", func(w http.ResponseWriter, r *http.Request) {
@@ -87,6 +155,13 @@ func main() {
 		radius := parseCordPart(r.FormValue("radius"), 0.01, 90, 5)
 		size := parseInt(r.FormValue("size"), 24, 2000, 400)
 		drawMap(w, centerx, centery, radius, size)
+	})
+	http.HandleFunc("/shortest-path", func(w http.ResponseWriter, r *http.Request) {
+		maxIdx := len(roadNetwork.Nodes)
+		src := parseInt(r.FormValue("src"), 1, maxIdx, rand.Intn(maxIdx)+1) - 1
+		dest := parseInt(r.FormValue("dest"), 1, maxIdx, rand.Intn(maxIdx)+1) - 1
+		size := parseInt(r.FormValue("size"), 24, 2000, 400)
+		drawShortestPath(w, src, dest, size)
 	})
 	http.HandleFunc("/vertex", func(w http.ResponseWriter, r *http.Request) {
 		i, err := strconv.Atoi(r.FormValue("i"))

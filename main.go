@@ -54,8 +54,10 @@ func main() {
 			return
 		}
 		fmt.Fprintf(w, "Cordinates: %s\n", roadNetwork.Nodes[i])
-		// TODO: show outbound edges
-		//fmt.Fprintf(w, "Edges:")
+		fmt.Fprintf(w, "Edges:")
+		for _, dest := range roadNetwork.AdjacencyLists[i] {
+			fmt.Fprintf(w, "\tDestination: %d at %s, Distance: %d\n", dest.Dest+1, roadNetwork.Nodes[dest.Dest], dest.Dist)
+		}
 	})
 	log.Print("Starting server...")
 	log.Fatal(http.ListenAndServe("localhost:8888", nil))

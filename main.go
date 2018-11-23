@@ -78,21 +78,14 @@ func parseCordPart(s string, min, max, defaultValue float64) int {
 	return int(x * 1e6)
 }
 
-// 42.1 N -98 W -> Cord{42100000, -98000000}
-//func parseCord(s string) graph.Cord {
-//}
-
 func main() {
 	setup()
+	http.Handle("/", http.FileServer(http.Dir("static")))
 	http.HandleFunc("/map", func(w http.ResponseWriter, r *http.Request) {
 		centerx := parseCordPart(r.FormValue("centerx"), -180, 180, -85)
-		log.Println(r.FormValue("centerx"), centerx)
 		centery := parseCordPart(r.FormValue("centery"), -180, 180, 44)
-		log.Println(r.FormValue("centery"), centery)
 		radius := parseCordPart(r.FormValue("radius"), 0.01, 90, 5)
-		log.Println(r.FormValue("radius"), radius)
 		size := parseInt(r.FormValue("size"), 24, 2000, 400)
-		log.Println(r.FormValue("size"), size)
 		drawMap(w, centerx, centery, radius, size)
 	})
 	http.HandleFunc("/vertex", func(w http.ResponseWriter, r *http.Request) {

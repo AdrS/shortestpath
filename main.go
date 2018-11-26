@@ -2,16 +2,15 @@ package main
 
 import (
 	"fmt"
+	"github.com/adrs/shortestpath/graph"
 	"image"
 	"image/color"
+	"image/gif"
 	"io"
-	"strconv"
-	//"image/gif"
-	"github.com/adrs/shortestpath/graph"
-	"image/png"
 	"log"
 	"math/rand"
 	"net/http"
+	"strconv"
 )
 
 func inRange(cord graph.Cord, minLat, maxLat, minLong, maxLong int) bool {
@@ -24,11 +23,25 @@ func pixelLocation(cord graph.Cord, minLat, minLong, radius, size int) (x, y int
 	return
 }
 
-func makeMap(centerx, centery, radius, size int) *image.RGBA {
-	img := image.NewRGBA(image.Rect(0, 0, size, size))
+var palette = []color.Color{
+	color.RGBA{255, 255, 255, 255}, // White
+	color.RGBA{128, 128, 128, 255}, // Grey
+	color.RGBA{0, 0, 255, 255},     // Green
+	color.RGBA{255, 0, 128, 255},   // Red
+}
+
+const (
+	backgroundColor = 0
+	unvisitedColor  = 1
+	visitedColor    = 2
+	pathColor       = 3
+)
+
+func makeMap(centerx, centery, radius, size int) *image.Paletted {
+	img := image.NewPaletted(image.Rect(0, 0, size, size), palette)
 	for y := 0; y < size; y++ {
 		for x := 0; x < size; x++ {
-			img.Set(x, y, color.RGBA{255, 255, 255, 255})
+			img.SetColorIndex(x, y, backgroundColor)
 		}
 	}
 	minLat := centery - radius
@@ -40,13 +53,16 @@ func makeMap(centerx, centery, radius, size int) *image.RGBA {
 			continue
 		}
 		x, y := pixelLocation(cord, minLat, minLong, radius, size)
-		img.Set(x, size-y, color.RGBA{128, 128, 128, 255})
+		img.SetColorIndex(x, size-y, unvisitedColor)
 	}
 	return img
 }
 
 func drawMap(out io.Writer, centerx, centery, radius, size int) {
-	png.Encode(out, makeMap(centerx, centery, radius, size))
+	img := gif.GIF{}
+	img.Delay = append(img.Delay, 0)
+	img.Image = append(img.Image, makeMap(centerx, centery, radius, size))
+	gif.EncodeAll(out, &img)
 }
 
 func abs(x int) int {
@@ -93,13 +109,20 @@ func drawShortestPath(out io.Writer, src, dest, size int) { //, frames int, anim
 	centery := (minLat + maxLat) / 2
 	dx := maxLong - minLong
 	dy := maxLat - minLat
-	radius := max(max(dx, dy)*11/20, 5e4) // TODO: adjust zoom
+	radius := max(max(dx, dy)*11/20, 5e4)
+	// TODO: add map boundaries
+	// Resize image to remove space beyond map boundaries
 	minLat = centery - radius
 	maxLat = centery + radius
 	minLong = centerx - radius
 	maxLong = centerx + radius
 
+	// TODO: generate animation
+	anim := gif.GIF{}
 	baseMap := makeMap(centerx, centery, radius, size)
+	anim.Image = append(anim.Image, baseMap)
+	anim.Delay = append(anim.Delay, 0)
+
 	// Show search sequence
 	for _, v := range searchSeq {
 		cord := roadNetwork.Nodes[v]
@@ -107,8 +130,7 @@ func drawShortestPath(out io.Writer, src, dest, size int) { //, frames int, anim
 			continue
 		}
 		x, y := pixelLocation(cord, minLat, minLong, radius, size)
-		// TODO: parameterize colors
-		baseMap.Set(x, size-y, color.RGBA{128, 255, 128, 255})
+		baseMap.SetColorIndex(x, size-y, visitedColor)
 	}
 
 	// Show shortest path
@@ -118,9 +140,9 @@ func drawShortestPath(out io.Writer, src, dest, size int) { //, frames int, anim
 			continue
 		}
 		x, y := pixelLocation(cord, minLat, minLong, radius, size)
-		baseMap.Set(x, size-y, color.RGBA{255, 0, 128, 255})
+		baseMap.SetColorIndex(x, size-y, pathColor)
 	}
-	png.Encode(out, baseMap)
+	gif.EncodeAll(out, &anim)
 }
 
 var roadNetwork *graph.Graph

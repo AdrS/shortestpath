@@ -40,6 +40,12 @@ func (c Cord) String() string {
 	return fmt.Sprintf("%f %s %f %s", math.Abs(lat), latDir, math.Abs(long), longDir)
 }
 
+// Returns square of the distance between cordinates
+func DistanceSquared(a, b Cord) int64 {
+	dx, dy := int64(a.Long-b.Long), int64(a.Lat-b.Lat)
+	return dx*dx + dy*dy
+}
+
 type Dest struct {
 	Dest int
 	Dist int

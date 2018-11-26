@@ -8,6 +8,7 @@ import (
 	"image/gif"
 	"io"
 	"log"
+	"math"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -15,6 +16,21 @@ import (
 
 func inRange(cord graph.Cord, minLat, maxLat, minLong, maxLong int) bool {
 	return cord.Lat >= minLat && cord.Lat <= maxLat && cord.Long >= minLong && cord.Long <= maxLong
+}
+
+// Finds vertex in graph closest to cordinate
+func closestVertex(cord graph.Cord) int {
+	closest := 0
+	var minDist int64
+	minDist = math.MaxInt64
+	for i, v := range roadNetwork.Nodes {
+		dist := graph.DistanceSquared(cord, v)
+		if dist < minDist {
+			minDist = dist
+			closest = i
+		}
+	}
+	return closest
 }
 
 func pixelLocation(cord graph.Cord, minLat, minLong, radius, size int) (x, y int) {
@@ -284,6 +300,14 @@ func main() {
 		for _, dest := range roadNetwork.AdjacencyLists[i] {
 			fmt.Fprintf(w, "\tDestination: %d at %s, Distance: %d\n", dest.Dest+1, roadNetwork.Nodes[dest.Dest], dest.Dist)
 		}
+	})
+	http.HandleFunc("/closest-vertex", func(w http.ResponseWriter, r *http.Request) {
+		x := parseCordPart(r.FormValue("x"), -180, 180, -85)
+		y := parseCordPart(r.FormValue("y"), -180, 180, 44)
+		id := closestVertex(graph.Cord{Lat: y, Long: x})
+		lat, long := roadNetwork.Nodes[id].Lat, roadNetwork.Nodes[id].Long
+		w.Header().Add("Content-Type", "application/json")
+		fmt.Fprintf(w, "{\"Lat\": %d, \"Long\": %d, \"NodeId\": %d}", lat, long, id)
 	})
 	log.Print("Starting server...")
 	log.Fatal(http.ListenAndServe("localhost:8888", nil))

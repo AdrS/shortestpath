@@ -26,8 +26,10 @@ func pixelLocation(cord graph.Cord, minLat, minLong, radius, size int) (x, y int
 var palette = []color.Color{
 	color.RGBA{255, 255, 255, 255}, // White
 	color.RGBA{128, 128, 128, 255}, // Grey
-	color.RGBA{0, 0, 255, 255},     // Green
-	color.RGBA{255, 0, 128, 255},   // Red
+	color.RGBA{0, 255, 0, 255},     // Green
+	color.RGBA{255, 0, 0, 255},     // Red
+	//color.RGBA{255, 128, 128, 255}, // Red
+	//color.RGBA{0, 128, 0, 255},     // Green
 }
 
 const (
@@ -99,7 +101,15 @@ func findCordinateRange(indices []int, cords []graph.Cord) (minLat, maxLat, minL
 	return minLat, maxLat, minLong, maxLong
 }
 
-func drawShortestPath(out io.Writer, src, dest, size int) { //, frames int, animate bool) {
+func copyImage(org *image.Paletted) *image.Paletted {
+	copy := image.NewPaletted(org.Rect, org.Palette)
+	for i, v := range org.Pix {
+		copy.Pix[i] = v
+	}
+	return copy
+}
+
+func drawShortestPath(out io.Writer, src, dest, size, frames, delay int) {
 	// TODO: validate src and dest
 	shortestPath, searchSeq := graph.SearchSequence(roadNetwork, src, dest)
 
@@ -117,20 +127,23 @@ func drawShortestPath(out io.Writer, src, dest, size int) { //, frames int, anim
 	minLong = centerx - radius
 	maxLong = centerx + radius
 
-	// TODO: generate animation
+	// Generate animation
 	anim := gif.GIF{}
-	baseMap := makeMap(centerx, centery, radius, size)
-	anim.Image = append(anim.Image, baseMap)
-	anim.Delay = append(anim.Delay, 0)
+	img := makeMap(centerx, centery, radius, size)
+	stepsPerFrame := len(searchSeq) / frames
 
 	// Show search sequence
-	for _, v := range searchSeq {
+	for i, v := range searchSeq {
 		cord := roadNetwork.Nodes[v]
 		if !inRange(cord, minLat, maxLat, minLong, maxLong) {
 			continue
 		}
 		x, y := pixelLocation(cord, minLat, minLong, radius, size)
-		baseMap.SetColorIndex(x, size-y, visitedColor)
+		img.SetColorIndex(x, size-y, visitedColor)
+		if i%stepsPerFrame == 0 {
+			anim.Image = append(anim.Image, copyImage(img))
+			anim.Delay = append(anim.Delay, delay)
+		}
 	}
 
 	// Show shortest path
@@ -140,8 +153,10 @@ func drawShortestPath(out io.Writer, src, dest, size int) { //, frames int, anim
 			continue
 		}
 		x, y := pixelLocation(cord, minLat, minLong, radius, size)
-		baseMap.SetColorIndex(x, size-y, pathColor)
+		img.SetColorIndex(x, size-y, pathColor)
 	}
+	anim.Image = append(anim.Image, img)
+	anim.Delay = append(anim.Delay, delay*3)
 	gif.EncodeAll(out, &anim)
 }
 
@@ -205,8 +220,9 @@ func main() {
 		dest := parseInt(r.FormValue("dest"), 1, maxIdx, rand.Intn(maxIdx)+1) - 1
 		size := parseInt(r.FormValue("size"), 24, 2000, 400)
 		//animate := (parseInt(r.FormValue("animate"), 0, 1, 1) == 1)
-		//frames := parseInt(r.FormValue("frames"), 1, 120, 15)
-		drawShortestPath(w, src, dest, size)
+		frames := parseInt(r.FormValue("frames"), 1, 120, 15)
+		delay := parseInt(r.FormValue("delay"), 0, 2000, 500) / 10
+		drawShortestPath(w, src, dest, size, frames, delay)
 	})
 	http.HandleFunc("/vertex", func(w http.ResponseWriter, r *http.Request) {
 		i, err := strconv.Atoi(r.FormValue("i"))

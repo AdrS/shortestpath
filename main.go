@@ -109,8 +109,37 @@ func copyImage(org *image.Paletted) *image.Paletted {
 	return copy
 }
 
+// From: https://stackoverflow.com/questions/51626905/drawing-circles-with-two-radius-in-golang
+func drawCircle(img *image.Paletted, x0, y0, r int, c uint8) {
+	x, y, dx, dy := r-1, 0, 1, 1
+	err := dx - (r * 2)
+
+	for x > y {
+		img.SetColorIndex(x0+x, y0+y, c)
+		img.SetColorIndex(x0+y, y0+x, c)
+		img.SetColorIndex(x0-y, y0+x, c)
+		img.SetColorIndex(x0-x, y0+y, c)
+		img.SetColorIndex(x0-x, y0-y, c)
+		img.SetColorIndex(x0-y, y0-x, c)
+		img.SetColorIndex(x0+y, y0-x, c)
+		img.SetColorIndex(x0+x, y0-y, c)
+
+		if err <= 0 {
+			y++
+			err += dy
+			dy += 2
+		}
+		if err > 0 {
+			x--
+			dx += 2
+			err += dx - (r * 2)
+		}
+	}
+}
+
 func drawShortestPath(out io.Writer, src, dest, size, frames, delay int) {
 	// TODO: validate src and dest
+	// TODO: cache searches
 	shortestPath, searchSeq := graph.SearchSequence(roadNetwork, src, dest)
 
 	// Determine bounds from search sequence
@@ -130,7 +159,17 @@ func drawShortestPath(out io.Writer, src, dest, size, frames, delay int) {
 	// Generate animation
 	anim := gif.GIF{}
 	img := makeMap(centerx, centery, radius, size)
-	stepsPerFrame := len(searchSeq) / frames
+	stepsPerFrame := len(searchSeq)
+	if frames > 1 {
+		stepsPerFrame /= (frames - 1)
+	}
+
+	// Draws circles at src and dest
+	drawEndpoint := func(img *image.Paletted, v, r int) {
+		cord := roadNetwork.Nodes[v]
+		x, y := pixelLocation(cord, minLat, minLong, radius, size)
+		drawCircle(img, x, size-y, r, pathColor)
+	}
 
 	// Show search sequence
 	for i, v := range searchSeq {
@@ -140,7 +179,10 @@ func drawShortestPath(out io.Writer, src, dest, size, frames, delay int) {
 		}
 		x, y := pixelLocation(cord, minLat, minLong, radius, size)
 		img.SetColorIndex(x, size-y, visitedColor)
-		if i%stepsPerFrame == 0 {
+
+		if i%stepsPerFrame == 0 && frames > 1 {
+			drawEndpoint(img, src, 3)
+			drawEndpoint(img, dest, 3)
 			anim.Image = append(anim.Image, copyImage(img))
 			anim.Delay = append(anim.Delay, delay)
 		}
@@ -155,8 +197,10 @@ func drawShortestPath(out io.Writer, src, dest, size, frames, delay int) {
 		x, y := pixelLocation(cord, minLat, minLong, radius, size)
 		img.SetColorIndex(x, size-y, pathColor)
 	}
+	drawEndpoint(img, src, 5)
+	drawEndpoint(img, dest, 5)
 	anim.Image = append(anim.Image, img)
-	anim.Delay = append(anim.Delay, delay*3)
+	anim.Delay = append(anim.Delay, delay*7)
 	gif.EncodeAll(out, &anim)
 }
 
@@ -219,9 +263,9 @@ func main() {
 		src := parseInt(r.FormValue("src"), 1, maxIdx, rand.Intn(maxIdx)+1) - 1
 		dest := parseInt(r.FormValue("dest"), 1, maxIdx, rand.Intn(maxIdx)+1) - 1
 		size := parseInt(r.FormValue("size"), 24, 2000, 400)
-		//animate := (parseInt(r.FormValue("animate"), 0, 1, 1) == 1)
 		frames := parseInt(r.FormValue("frames"), 1, 120, 15)
 		delay := parseInt(r.FormValue("delay"), 0, 2000, 500) / 10
+		// Browsers ignore loop count field in gifs :(
 		drawShortestPath(w, src, dest, size, frames, delay)
 	})
 	http.HandleFunc("/vertex", func(w http.ResponseWriter, r *http.Request) {

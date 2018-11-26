@@ -63,20 +63,41 @@ func max(a, b int) int {
 	return b
 }
 
-func drawShortestPath(out io.Writer, src, dest, size int) {
+// Finds range of coordinate values specified by indices
+func findCordinateRange(indices []int, cords []graph.Cord) (minLat, maxLat, minLong, maxLong int) {
+	minLat, maxLat, minLong, maxLong = 180000000, -180000000, 180000000, -180000000
+	for _, i := range indices {
+		if cords[i].Lat > maxLat {
+			maxLat = cords[i].Lat
+		}
+		if cords[i].Lat < minLat {
+			minLat = cords[i].Lat
+		}
+		if cords[i].Long > maxLong {
+			maxLong = cords[i].Long
+		}
+		if cords[i].Long < minLong {
+			minLong = cords[i].Long
+		}
+	}
+	return minLat, maxLat, minLong, maxLong
+}
+
+func drawShortestPath(out io.Writer, src, dest, size int) { //, frames int, animate bool) {
 	// TODO: validate src and dest
 	shortestPath, searchSeq := graph.SearchSequence(roadNetwork, src, dest)
 
-	// TODO: determine bounds from search sequence
-	centerx := (roadNetwork.Nodes[src].Long + roadNetwork.Nodes[dest].Long) / 2
-	centery := (roadNetwork.Nodes[src].Lat + roadNetwork.Nodes[dest].Lat) / 2
-	dx := abs(roadNetwork.Nodes[src].Long - roadNetwork.Nodes[dest].Long)
-	dy := abs(roadNetwork.Nodes[src].Lat - roadNetwork.Nodes[dest].Lat)
-	radius := max(max(dx, dy)*3/2, 1e5)
-	minLat := centery - radius
-	maxLat := centery + radius
-	minLong := centerx - radius
-	maxLong := centerx + radius
+	// Determine bounds from search sequence
+	minLat, maxLat, minLong, maxLong := findCordinateRange(searchSeq, roadNetwork.Nodes)
+	centerx := (minLong + maxLong) / 2
+	centery := (minLat + maxLat) / 2
+	dx := maxLong - minLong
+	dy := maxLat - minLat
+	radius := max(max(dx, dy)*11/20, 5e4) // TODO: adjust zoom
+	minLat = centery - radius
+	maxLat = centery + radius
+	minLong = centerx - radius
+	maxLong = centerx + radius
 
 	baseMap := makeMap(centerx, centery, radius, size)
 	// Show search sequence
@@ -161,6 +182,8 @@ func main() {
 		src := parseInt(r.FormValue("src"), 1, maxIdx, rand.Intn(maxIdx)+1) - 1
 		dest := parseInt(r.FormValue("dest"), 1, maxIdx, rand.Intn(maxIdx)+1) - 1
 		size := parseInt(r.FormValue("size"), 24, 2000, 400)
+		//animate := (parseInt(r.FormValue("animate"), 0, 1, 1) == 1)
+		//frames := parseInt(r.FormValue("frames"), 1, 120, 15)
 		drawShortestPath(w, src, dest, size)
 	})
 	http.HandleFunc("/vertex", func(w http.ResponseWriter, r *http.Request) {

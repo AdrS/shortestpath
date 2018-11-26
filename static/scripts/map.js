@@ -1,7 +1,48 @@
 function $(id) { return document.getElementById(id); }
+
+function displaySearch() {
+	var sy = $('src_lat').value;
+	var sx = -$('src_long').value;
+	var dy = $('dest_lat').value;
+	var dx = -$('dest_long').value;
+	var frames = $('frames').value;
+
+	// TODO: cache coordinate lookups
+	var src = null;
+	var dest = null;
+	var reqs = new XMLHttpRequest();
+	var reqd = new XMLHttpRequest();
+
+	function update() {
+		if(!src && reqs.readyState === XMLHttpRequest.DONE && reqs.status === 200) {
+			var r = JSON.parse(reqs.responseText);
+			console.log(r);
+			src = parseInt(r['NodeId']);
+		}
+		if(!dest && reqs.readyState === XMLHttpRequest.DONE && reqd.status === 200) {
+			var r = JSON.parse(reqd.responseText);
+			console.log(r);
+			dest = parseInt(r['NodeId']);
+		}
+		if(src !== null && dest !== null) {
+			$('route_map').src = 'shortest-path?size=600&frames=' + frames + '&src=' + src + '&dest=' + dest;
+		}
+	}
+
+	reqs.onreadystatechange = update;
+	reqs.open('GET', 'closest-vertex?y=' + sy + '&x=' + sx);
+	reqs.send();
+	reqd.onreadystatechange = update;
+	reqd.open('GET', 'closest-vertex?y=' + dy + '&x=' + dx);
+	reqd.send();
+}
+
 window.onload = function() {
 	initMap('a2');
 	initMap('michigan');
+
+	$('src_lat').onchange = $('src_long').onchange = $('dest_lat').onchange = $('dest_long').onchange = $('frames').onchange = displaySearch;
+	displaySearch();
 }
 
 function makeButton(value, onclick) {

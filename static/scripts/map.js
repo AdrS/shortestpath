@@ -28,7 +28,8 @@ function initMap(id) {
 
 	function refresh() {
 		img.src = 'map?centerx=' + x + '&centery=' + y + '&radius=' + radius + '&size=500';
-		// TODO: pick appropriate size
+		// TODO: adjust size based on screen
+		// TOOD: resize images when browser window changes
 	}
 
 	function zoom(ratio) {

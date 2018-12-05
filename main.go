@@ -45,6 +45,7 @@ var palette = []color.Color{
 	color.RGBA{128, 128, 128, 255}, // Grey
 	color.RGBA{0, 255, 0, 255},     // Green
 	color.RGBA{255, 0, 0, 255},     // Red
+	color.RGBA{0, 0, 255, 255},     // Blue
 	//color.RGBA{255, 128, 128, 255}, // Red
 	//color.RGBA{0, 128, 0, 255},     // Green
 }
@@ -54,6 +55,7 @@ const (
 	unvisitedColor  = 1
 	visitedColor    = 2
 	pathColor       = 3
+	landmarkColor   = 4
 )
 
 func makeMap(centerx, centery, radius, size int) *image.Paletted {
@@ -199,11 +201,18 @@ func drawShortestPath(out io.Writer, src, dest, size, frames, delay int) {
 		stepsPerFrame /= (frames - 1)
 	}
 
-	// Draws circles at src and dest
-	drawEndpoint := func(img *image.Paletted, v, r int) {
-		cord := roadNetwork.Nodes[v]
-		x, y := pixelLocation(cord, minLat, minLong, radius, size)
-		drawCircle(img, x, size-y, r, pathColor)
+	// Draw landmarks and endpoints of path
+	pointSize := 5
+	drawPoints := func() {
+		drawNode := func(v int, color uint8) {
+			x, y := pixelLocation(roadNetwork.Nodes[v], minLat, minLong, radius, size)
+			drawCircle(img, x, size-y, pointSize, color)
+		}
+		drawNode(src, pathColor)
+		drawNode(dest, pathColor)
+		for _, u := range landmarks {
+			drawNode(u, landmarkColor)
+		}
 	}
 
 	// Show search sequence
@@ -216,8 +225,7 @@ func drawShortestPath(out io.Writer, src, dest, size, frames, delay int) {
 		img.SetColorIndex(x, size-y, visitedColor)
 
 		if i%stepsPerFrame == 0 && frames > 1 {
-			drawEndpoint(img, src, 3)
-			drawEndpoint(img, dest, 3)
+			drawPoints()
 			anim.Image = append(anim.Image, copyImage(img))
 			anim.Delay = append(anim.Delay, delay)
 		}
@@ -232,8 +240,7 @@ func drawShortestPath(out io.Writer, src, dest, size, frames, delay int) {
 		x, y := pixelLocation(cord, minLat, minLong, radius, size)
 		img.SetColorIndex(x, size-y, pathColor)
 	}
-	drawEndpoint(img, src, 5)
-	drawEndpoint(img, dest, 5)
+	drawPoints()
 	anim.Image = append(anim.Image, img)
 	anim.Delay = append(anim.Delay, delay*7)
 	gif.EncodeAll(out, &anim)
@@ -250,7 +257,7 @@ func setup(nodeFilePath, vertexFilePath string) {
 		log.Fatal(err)
 	}
 	log.Print("Picking landmarks...")
-	landmarks = graph.PickLandmarks(g, 1)
+	landmarks = graph.PickLandmarks(g, 16)
 	log.Print("Computing distances to landmarks...")
 	landmarkDistances = graph.DistancesFromLandmarks(g, landmarks)
 	roadNetwork = g

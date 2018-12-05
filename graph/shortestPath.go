@@ -208,7 +208,7 @@ func SearchSequence(graph *Graph, src, dest int, potential PotentialFunc) ([]int
 		vistSeq = append(vistSeq, u)
 
 		if u == dest {
-			log.Printf("Dist: %d\n", state.Nodes[u].Distance)
+			log.Printf("Found: %d, expected: %d\n", state.Nodes[u].Distance, Dijkstra(graph, src)[dest])
 			break
 		}
 
@@ -281,11 +281,7 @@ func PickLandmarks(graph *Graph, n int) []int {
 func DistancesFromLandmarks(graph *Graph, landmarks []int) [][]int {
 	distances := make([][]int, len(landmarks))
 	for i, landmark := range landmarks {
-		landmarkDistances := make([]int, len(graph.Nodes))
-		for j, d := range Dijkstra(graph, landmark) {
-			landmarkDistances[j] = d
-		}
-		distances[i] = landmarkDistances
+		distances[i] = Dijkstra(graph, landmark)
 	}
 	return distances
 }

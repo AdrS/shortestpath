@@ -11,6 +11,7 @@ import (
 	"math"
 	"math/rand"
 	"net/http"
+	"os"
 	"strconv"
 )
 
@@ -222,10 +223,9 @@ func drawShortestPath(out io.Writer, src, dest, size, frames, delay int) {
 
 var roadNetwork *graph.Graph
 
-func setup() {
+func setup(nodeFilePath, vertexFilePath string) {
 	log.Print("Loading graph...")
-	base := "/mnt/c/Users/adrian/Documents/EECS477/project/data/"
-	g, err := graph.LoadGraph(base+"USA-road-d.LKS.co", base+"USA-road-t.LKS.gr")
+	g, err := graph.LoadGraph(nodeFilePath, vertexFilePath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -264,8 +264,12 @@ func parseCordPart(s string, min, max, defaultValue float64) int {
 }
 
 func main() {
+	if len(os.Args) != 3 {
+		fmt.Fprintf(os.Stderr, "usage: %s <node file> <vertex file>\n", os.Args[0])
+		os.Exit(1)
+	}
 	rand.Seed(42)
-	setup()
+	setup(os.Args[1], os.Args[2])
 	http.Handle("/", http.FileServer(http.Dir("static")))
 	http.HandleFunc("/map", func(w http.ResponseWriter, r *http.Request) {
 		centerx := parseCordPart(r.FormValue("centerx"), -180, 180, -85)

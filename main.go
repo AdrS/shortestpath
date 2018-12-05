@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 )
 
 func inRange(cord graph.Cord, minLat, maxLat, minLong, maxLong int) bool {
@@ -310,6 +311,20 @@ func parseCordPart(s string, min, max, defaultValue float64) int {
 	return int(x * 1e6)
 }
 
+// Parses cordinate string like "42.2808,-83.7430"
+func parseCords(s string, xmin, xmax, ymin, ymax, xd, yd float64) graph.Cord {
+	parts := strings.Split(s, ",")
+	var lat, long int
+	if len(parts) == 2 {
+		lat = parseCordPart(parts[0], ymin, ymax, yd)
+		long = parseCordPart(parts[1], xmin, xmax, xd)
+	} else {
+		lat = int(yd * 1e6)
+		long = int(xd * 1e6)
+	}
+	return graph.Cord{Lat: lat, Long: long}
+}
+
 func main() {
 	if len(os.Args) != 3 {
 		fmt.Fprintf(os.Stderr, "usage: %s <node file> <vertex file>\n", os.Args[0])
@@ -328,8 +343,22 @@ func main() {
 
 	http.HandleFunc("/shortest-path", func(w http.ResponseWriter, r *http.Request) {
 		maxIdx := len(roadNetwork.Nodes)
-		src := parseInt(r.FormValue("src"), 1, maxIdx, rand.Intn(maxIdx)+1) - 1
-		dest := parseInt(r.FormValue("dest"), 1, maxIdx, rand.Intn(maxIdx)+1) - 1
+		//src := parseInt(r.FormValue("src"), 1, maxIdx, rand.Intn(maxIdx)+1) - 1
+		//dest := parseInt(r.FormValue("dest"), 1, maxIdx, rand.Intn(maxIdx)+1) - 1
+		var src, dest int
+		if r.FormValue("src") != "" {
+			srcCord := parseCords(r.FormValue("src"), -180, 180, -180, 180, -83.74, 42.28)
+			src = closestVertex(srcCord)
+		} else {
+			src = rand.Intn(maxIdx)
+		}
+		if r.FormValue("dest") != "" {
+			destCord := parseCords(r.FormValue("dest"), -180, 180, -180, 180, -83.53, 41.65)
+			dest = closestVertex(destCord)
+
+		} else {
+			dest = rand.Intn(maxIdx)
+		}
 		size := parseInt(r.FormValue("size"), 24, 2000, 400)
 		frames := parseInt(r.FormValue("frames"), 1, 120, 15)
 		delay := parseInt(r.FormValue("delay"), 0, 2000, 500) / 10

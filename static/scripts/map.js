@@ -8,34 +8,7 @@ function displaySearch() {
 	var frames = $('frames').value;
 	var algorithm = $('algorithm').value;
 
-	// TODO: cache coordinate lookups
-	var src = null;
-	var dest = null;
-	var reqs = new XMLHttpRequest();
-	var reqd = new XMLHttpRequest();
-
-	function update() {
-		if(!src && reqs.readyState === XMLHttpRequest.DONE && reqs.status === 200) {
-			var r = JSON.parse(reqs.responseText);
-			console.log(r);
-			src = parseInt(r['NodeId']);
-		}
-		if(!dest && reqs.readyState === XMLHttpRequest.DONE && reqd.status === 200) {
-			var r = JSON.parse(reqd.responseText);
-			console.log(r);
-			dest = parseInt(r['NodeId']);
-		}
-		if(src !== null && dest !== null) {
-			$('route_map').src = 'shortest-path?size=600&frames=' + frames + '&src=' + src + '&dest=' + dest + '&algorithm=' + algorithm;
-		}
-	}
-
-	reqs.onreadystatechange = update;
-	reqs.open('GET', 'closest-vertex?y=' + sy + '&x=' + sx);
-	reqs.send();
-	reqd.onreadystatechange = update;
-	reqd.open('GET', 'closest-vertex?y=' + dy + '&x=' + dx);
-	reqd.send();
+	$('route_map').src = 'shortest-path?size=600&frames=' + frames + '&src=' + sy + ',' + sx + '&dest=' + dy + ',' + dx + '&algorithm=' + algorithm;
 }
 
 window.onload = function() {

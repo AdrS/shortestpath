@@ -159,6 +159,8 @@ func drawCircle(img *image.Paletted, x0, y0, r int, c uint8) {
 }
 
 type ShortestPathInfo struct {
+	Src          int
+	Dest         int
 	ShortestPath []int
 	SearchSeq    []int
 	Centerx      int
@@ -202,6 +204,8 @@ func getShortestPath(src, dest int, algorithm string) *ShortestPathInfo {
 	centery := (minLat + maxLat) / 2
 	radius := max(max(maxLong-minLong, maxLat-minLat)*11/20, 5e4)
 	return &ShortestPathInfo{
+		Src:          src,
+		Dest:         dest,
 		ShortestPath: shortestPath,
 		SearchSeq:    searchSeq,
 		Centerx:      centerx,
@@ -211,17 +215,20 @@ func getShortestPath(src, dest int, algorithm string) *ShortestPathInfo {
 }
 
 // TODO: cache src, dst, algorithm -> results
-func drawShortestPath(out io.Writer, src, dest, size, frames, delay int, algorithm string) {
-	results := getShortestPath(src, dest, algorithm)
-	minLat := results.Centery - results.Radius
-	maxLat := results.Centery + results.Radius
-	minLong := results.Centerx - results.Radius
-	maxLong := results.Centerx + results.Radius
+func drawShortestPath(out io.Writer, pathInfo *ShortestPathInfo, size, frames, delay int, xoffset, yoffset, zoom float64) {
+	// TODO: fix offset part (handle clientside?)
+	centerx := pathInfo.Centerx + int(float64(pathInfo.Radius)*xoffset)
+	centery := pathInfo.Centery + int(float64(pathInfo.Radius)*yoffset)
+	radius := int(float64(pathInfo.Radius) / zoom)
+	minLat := centery - radius
+	maxLat := centery + radius
+	minLong := centerx - radius
+	maxLong := centerx + radius
 
 	// Generate animation
 	anim := gif.GIF{}
-	img := makeMap(results.Centerx, results.Centery, results.Radius, size)
-	stepsPerFrame := len(results.SearchSeq)
+	img := makeMap(centerx, centery, radius, size)
+	stepsPerFrame := len(pathInfo.SearchSeq)
 	if frames > 1 {
 		stepsPerFrame /= (frames - 1)
 	}
@@ -230,23 +237,23 @@ func drawShortestPath(out io.Writer, src, dest, size, frames, delay int, algorit
 	pointSize := 5
 	drawPoints := func() {
 		drawNode := func(v int, color uint8) {
-			x, y := pixelLocation(roadNetwork.Nodes[v], minLat, minLong, results.Radius, size)
+			x, y := pixelLocation(roadNetwork.Nodes[v], minLat, minLong, radius, size)
 			drawCircle(img, x, size-y, pointSize, color)
 		}
-		drawNode(src, pathColor)
-		drawNode(dest, pathColor)
+		drawNode(pathInfo.Src, pathColor)
+		drawNode(pathInfo.Dest, pathColor)
 		for _, u := range landmarks {
 			drawNode(u, landmarkColor)
 		}
 	}
 
 	// Show search sequence
-	for i, v := range results.SearchSeq {
+	for i, v := range pathInfo.SearchSeq {
 		cord := roadNetwork.Nodes[v]
 		if !inRange(cord, minLat, maxLat, minLong, maxLong) {
 			continue
 		}
-		x, y := pixelLocation(cord, minLat, minLong, results.Radius, size)
+		x, y := pixelLocation(cord, minLat, minLong, radius, size)
 		img.SetColorIndex(x, size-y, visitedColor)
 
 		if i%stepsPerFrame == 0 && frames > 1 {
@@ -257,12 +264,12 @@ func drawShortestPath(out io.Writer, src, dest, size, frames, delay int, algorit
 	}
 
 	// Show shortest path
-	for _, v := range results.ShortestPath {
+	for _, v := range pathInfo.ShortestPath {
 		cord := roadNetwork.Nodes[v]
 		if !inRange(cord, minLat, maxLat, minLong, maxLong) {
 			continue
 		}
-		x, y := pixelLocation(cord, minLat, minLong, results.Radius, size)
+		x, y := pixelLocation(cord, minLat, minLong, radius, size)
 		img.SetColorIndex(x, size-y, pathColor)
 	}
 	drawPoints()
@@ -304,6 +311,20 @@ func parseInt(s string, min, max, defaultValue int) int {
 	return x
 }
 
+func parseFloat(s string, min, max, defaultValue float64) float64 {
+	x, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return defaultValue
+	}
+	if x < min {
+		x = min
+	}
+	if x > max {
+		x = max
+	}
+	return x
+}
+
 func parseOption(s string, options []string, defaultValue string) string {
 	for _, option := range options {
 		if s == option {
@@ -315,17 +336,7 @@ func parseOption(s string, options []string, defaultValue string) string {
 
 // takes part of a lat long cordinate and parses it
 func parseCordPart(s string, min, max, defaultValue float64) int {
-	x, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return int(defaultValue * 1e6)
-	}
-	if x < min {
-		x = min
-	}
-	if x > max {
-		x = max
-	}
-	return int(x * 1e6)
+	return int(parseFloat(s, min, max, defaultValue) * 1e6)
 }
 
 // Parses cordinate string like "42.2808,-83.7430"
@@ -381,8 +392,15 @@ func main() {
 		delay := parseInt(r.FormValue("delay"), 0, 2000, 500) / 10
 		algorithm := parseOption(r.FormValue("algorithm"), []string{"dijkstra", "alt"}, "alt")
 
+		// Panning offset as % of initial display radius
+		xoffset := parseFloat(r.FormValue("xoffset"), -1e6, 1e6, 0)
+		yoffset := parseFloat(r.FormValue("yoffset"), -1e6, 1e6, 0)
+		// Zoom
+		zoom := parseFloat(r.FormValue("zoom"), 0.01, 100, 1)
+
 		// Browsers ignore loop count field in gifs :(
-		drawShortestPath(w, src, dest, size, frames, delay, algorithm)
+		pathInfo := getShortestPath(src, dest, algorithm)
+		drawShortestPath(w, pathInfo, size, frames, delay, xoffset, yoffset, zoom)
 	})
 
 	http.HandleFunc("/vertex", func(w http.ResponseWriter, r *http.Request) {

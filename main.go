@@ -158,8 +158,17 @@ func drawCircle(img *image.Paletted, x0, y0, r int, c uint8) {
 	}
 }
 
-// TODO: cache src, dst, algorithm -> results
-func drawShortestPath(out io.Writer, src, dest, size, frames, delay int, algorithm string) {
+type ShortestPathInfo struct {
+	ShortestPath []int
+	SearchSeq    []int
+	Centerx      int
+	Centery      int
+	Radius       int
+}
+
+var searchCache map[string]*ShortestPathInfo
+
+func getShortestPath(src, dest int, algorithm string) *ShortestPathInfo {
 	// TODO: validate src and dest
 
 	// Pick potential function based on search method
@@ -191,20 +200,28 @@ func drawShortestPath(out io.Writer, src, dest, size, frames, delay int, algorit
 	minLat, maxLat, minLong, maxLong := findCordinateRange(searchSeq, roadNetwork.Nodes)
 	centerx := (minLong + maxLong) / 2
 	centery := (minLat + maxLat) / 2
-	dx := maxLong - minLong
-	dy := maxLat - minLat
-	radius := max(max(dx, dy)*11/20, 5e4)
-	// TODO: add map boundaries
-	// Resize image to remove space beyond map boundaries
-	minLat = centery - radius
-	maxLat = centery + radius
-	minLong = centerx - radius
-	maxLong = centerx + radius
+	radius := max(max(maxLong-minLong, maxLat-minLat)*11/20, 5e4)
+	return &ShortestPathInfo{
+		ShortestPath: shortestPath,
+		SearchSeq:    searchSeq,
+		Centerx:      centerx,
+		Centery:      centery,
+		Radius:       radius,
+	}
+}
+
+// TODO: cache src, dst, algorithm -> results
+func drawShortestPath(out io.Writer, src, dest, size, frames, delay int, algorithm string) {
+	results := getShortestPath(src, dest, algorithm)
+	minLat := results.Centery - results.Radius
+	maxLat := results.Centery + results.Radius
+	minLong := results.Centerx - results.Radius
+	maxLong := results.Centerx + results.Radius
 
 	// Generate animation
 	anim := gif.GIF{}
-	img := makeMap(centerx, centery, radius, size)
-	stepsPerFrame := len(searchSeq)
+	img := makeMap(results.Centerx, results.Centery, results.Radius, size)
+	stepsPerFrame := len(results.SearchSeq)
 	if frames > 1 {
 		stepsPerFrame /= (frames - 1)
 	}
@@ -213,7 +230,7 @@ func drawShortestPath(out io.Writer, src, dest, size, frames, delay int, algorit
 	pointSize := 5
 	drawPoints := func() {
 		drawNode := func(v int, color uint8) {
-			x, y := pixelLocation(roadNetwork.Nodes[v], minLat, minLong, radius, size)
+			x, y := pixelLocation(roadNetwork.Nodes[v], minLat, minLong, results.Radius, size)
 			drawCircle(img, x, size-y, pointSize, color)
 		}
 		drawNode(src, pathColor)
@@ -224,12 +241,12 @@ func drawShortestPath(out io.Writer, src, dest, size, frames, delay int, algorit
 	}
 
 	// Show search sequence
-	for i, v := range searchSeq {
+	for i, v := range results.SearchSeq {
 		cord := roadNetwork.Nodes[v]
 		if !inRange(cord, minLat, maxLat, minLong, maxLong) {
 			continue
 		}
-		x, y := pixelLocation(cord, minLat, minLong, radius, size)
+		x, y := pixelLocation(cord, minLat, minLong, results.Radius, size)
 		img.SetColorIndex(x, size-y, visitedColor)
 
 		if i%stepsPerFrame == 0 && frames > 1 {
@@ -240,12 +257,12 @@ func drawShortestPath(out io.Writer, src, dest, size, frames, delay int, algorit
 	}
 
 	// Show shortest path
-	for _, v := range shortestPath {
+	for _, v := range results.ShortestPath {
 		cord := roadNetwork.Nodes[v]
 		if !inRange(cord, minLat, maxLat, minLong, maxLong) {
 			continue
 		}
-		x, y := pixelLocation(cord, minLat, minLong, radius, size)
+		x, y := pixelLocation(cord, minLat, minLong, results.Radius, size)
 		img.SetColorIndex(x, size-y, pathColor)
 	}
 	drawPoints()

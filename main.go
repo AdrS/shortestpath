@@ -158,9 +158,9 @@ func drawCircle(img *image.Paletted, x0, y0, r int, c uint8) {
 	}
 }
 
+// TODO: cache src, dst, algorithm -> results
 func drawShortestPath(out io.Writer, src, dest, size, frames, delay int, algorithm string) {
 	// TODO: validate src and dest
-	// TODO: cache searches
 
 	// Pick potential function based on search method
 	landmarkPotential := func(v int) int {
@@ -265,7 +265,7 @@ func setup(nodeFilePath, vertexFilePath string) {
 		log.Fatal(err)
 	}
 	log.Print("Picking landmarks...")
-	landmarks = graph.PickLandmarks(g, 16)
+	landmarks = graph.PickFarthestLandmarks(g, 16)
 	log.Print("Computing distances to landmarks...")
 	landmarkDistances = graph.DistancesFromLandmarks(g, landmarks)
 	roadNetwork = g

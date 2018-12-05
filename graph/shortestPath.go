@@ -276,8 +276,10 @@ func Dijkstra(graph *Graph, src int) []int {
 	return distances
 }
 
-// Picks n nodes to be landmarks
-func PickLandmarks(graph *Graph, n int) []int {
+// TODO: use map[string]->function pattern
+
+// Returns list of landmarks and distances for landmarks to every point
+func PickRandomLandmarks(graph *Graph, n int) []int {
 	// Start with random selection
 	landmarks := make([]int, 0)
 	for i := 0; i < n; i++ {
@@ -293,4 +295,56 @@ func DistancesFromLandmarks(graph *Graph, landmarks []int) [][]int {
 		distances[i] = Dijkstra(graph, landmark)
 	}
 	return distances
+}
+
+// Find how many hops every element is from src
+func bfs(graph *Graph, src int) []int {
+	distances := make([]int, len(graph.Nodes))
+	for i := range distances {
+		distances[i] = math.MaxInt64
+	}
+	queue := make([]int, 0)
+	queue = append(queue, src)
+	distances[src] = 0
+	for len(queue) > 0 {
+		u := queue[0]
+		queue = queue[1:]
+		for _, dest := range graph.AdjacencyLists[u] {
+			v := dest.Dest
+			// if undiscovered add to queue
+			if distances[v] == math.MaxInt64 {
+				distances[v] = distances[u] + 1
+				queue = append(queue, v)
+			}
+		}
+	}
+	return distances
+}
+
+func PickFarthestLandmarks(graph *Graph, n int) []int {
+	// Start with random landmark
+	landmarks := make([]int, 0)
+	landmarks = append(landmarks, rand.Intn(len(graph.Nodes)))
+
+	distanceFromSet := bfs(graph, landmarks[0])
+
+	// Pick node greatest number of hops from previously picked landmarks as next
+	for i := 1; i < n; i++ {
+		maxDist := 0
+		next := 0
+		for j, dist := range distanceFromSet {
+			if dist > maxDist {
+				maxDist = dist
+				next = j
+			}
+		}
+		landmarks = append(landmarks, next)
+		// Update node distances from set
+		for j, dist := range bfs(graph, next) {
+			if dist < distanceFromSet[j] {
+				distanceFromSet[j] = dist
+			}
+		}
+	}
+	return landmarks
 }

@@ -162,13 +162,25 @@ func NewSearchState(size int) *SearchState {
 	return &s
 }
 
+// Potential functions:
+// - function pi: V -> R
+// - transforms edge weights from w(u, v) -> w_{pi}(u, v) = w(u, v) - pi(u) + pi(v)
+// - for any path P from s to t, l_{pi}(P) = l(P) - pi(s) + pi(t) (telescoping sum)
+// - => transformation does not change shortest paths (does change lengths)
+// - d_pi(s, u) = d(s, u) - pi(s) + pi(u)
+// - potential must be feasible: w_{pi}(u, v) >= 0 for all u, v (otherwise we cannot run Dijkstra)
+//
+// - pick potential that is lower bound on d(u, t)
+//
+// - A* = Dijkstra where next v is chosen to minimize dist(v) + pi(v) [lower bound of d(v,t)]
+//
+// Set all potentials to 0 to use Dijkstra's
+
 // Runs a shortest path algorithm from source to dest
 // and returns the reverse of the shortest path and
 // the sequence of vertices visited
-func SearchSequence(graph *Graph, src, dest int) ([]int, []int) {
-	// Use Dijkstra's algorithm
+func SearchSequence(graph *Graph, src, dest int, potential []int) ([]int, []int) {
 	state := NewSearchState(len(graph.Nodes))
-
 	vistSeq := make([]int, 0)
 
 	state.Relax(-1, src, 0)
@@ -188,7 +200,7 @@ func SearchSequence(graph *Graph, src, dest int) ([]int, []int) {
 		for _, dest := range graph.AdjacencyLists[u] {
 			v := dest.Dest
 			if !state.Nodes[v].Processed {
-				state.Relax(u, dest.Dest, dest.Dist+state.Nodes[u].Distance)
+				state.Relax(u, dest.Dest, dest.Dist+state.Nodes[u].Distance+potential[u])
 			}
 		}
 	}

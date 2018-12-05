@@ -157,7 +157,7 @@ func drawCircle(img *image.Paletted, x0, y0, r int, c uint8) {
 func drawShortestPath(out io.Writer, src, dest, size, frames, delay int) {
 	// TODO: validate src and dest
 	// TODO: cache searches
-	shortestPath, searchSeq := graph.SearchSequence(roadNetwork, src, dest)
+	shortestPath, searchSeq := graph.SearchSequence(roadNetwork, src, dest, dijkstraPotentials)
 
 	// Determine bounds from search sequence
 	minLat, maxLat, minLong, maxLong := findCordinateRange(searchSeq, roadNetwork.Nodes)
@@ -222,6 +222,7 @@ func drawShortestPath(out io.Writer, src, dest, size, frames, delay int) {
 }
 
 var roadNetwork *graph.Graph
+var dijkstraPotentials []int
 
 func setup(nodeFilePath, vertexFilePath string) {
 	log.Print("Loading graph...")
@@ -229,6 +230,8 @@ func setup(nodeFilePath, vertexFilePath string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	dijkstraPotentials = make([]int, len(g.Nodes))
 	roadNetwork = g
 }
 

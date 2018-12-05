@@ -46,6 +46,7 @@ var palette = []color.Color{
 	color.RGBA{0, 255, 0, 255},     // Green
 	color.RGBA{255, 0, 0, 255},     // Red
 	color.RGBA{0, 0, 255, 255},     // Blue
+	color.RGBA{255, 215, 0, 255},   // Gold
 	//color.RGBA{255, 128, 128, 255}, // Red
 	//color.RGBA{0, 128, 0, 255},     // Green
 }
@@ -53,9 +54,9 @@ var palette = []color.Color{
 const (
 	backgroundColor = 0
 	unvisitedColor  = 1
-	visitedColor    = 2
-	pathColor       = 3
-	landmarkColor   = 4
+	visitedColor    = 5
+	pathColor       = 4
+	landmarkColor   = 3
 )
 
 func makeMap(centerx, centery, radius, size int) *image.Paletted {
@@ -156,9 +157,11 @@ func drawCircle(img *image.Paletted, x0, y0, r int, c uint8) {
 	}
 }
 
-func drawShortestPath(out io.Writer, src, dest, size, frames, delay int) {
+func drawShortestPath(out io.Writer, src, dest, size, frames, delay int, algorithm string) {
 	// TODO: validate src and dest
 	// TODO: cache searches
+
+	// Pick potential function based on search method
 	landmarkPotential := func(v int) int {
 		// max{d(L, t) - dist(L, v) for L in landmarks}
 		maxDist := 0
@@ -174,10 +177,14 @@ func drawShortestPath(out io.Writer, src, dest, size, frames, delay int) {
 		}
 		return maxDist
 	}
-	shortestPath, searchSeq := graph.SearchSequence(roadNetwork, src, dest, landmarkPotential)
 
-	//dijkstraPotential := func(int) int { return 0 }
-	//shortestPath, searchSeq := graph.SearchSequence(roadNetwork, src, dest, dijkstraPotential)
+	var potential graph.PotentialFunc
+	if algorithm == "dijkstra" {
+		potential = func(int) int { return 0 }
+	} else {
+		potential = landmarkPotential
+	}
+	shortestPath, searchSeq := graph.SearchSequence(roadNetwork, src, dest, potential)
 
 	// Determine bounds from search sequence
 	minLat, maxLat, minLong, maxLong := findCordinateRange(searchSeq, roadNetwork.Nodes)
@@ -279,6 +286,15 @@ func parseInt(s string, min, max, defaultValue int) int {
 	return x
 }
 
+func parseOption(s string, options []string, defaultValue string) string {
+	for _, option := range options {
+		if s == option {
+			return option
+		}
+	}
+	return defaultValue
+}
+
 // takes part of a lat long cordinate and parses it
 func parseCordPart(s string, min, max, defaultValue float64) int {
 	x, err := strconv.ParseFloat(s, 64)
@@ -309,6 +325,7 @@ func main() {
 		size := parseInt(r.FormValue("size"), 24, 2000, 400)
 		drawMap(w, centerx, centery, radius, size)
 	})
+
 	http.HandleFunc("/shortest-path", func(w http.ResponseWriter, r *http.Request) {
 		maxIdx := len(roadNetwork.Nodes)
 		src := parseInt(r.FormValue("src"), 1, maxIdx, rand.Intn(maxIdx)+1) - 1
@@ -316,9 +333,12 @@ func main() {
 		size := parseInt(r.FormValue("size"), 24, 2000, 400)
 		frames := parseInt(r.FormValue("frames"), 1, 120, 15)
 		delay := parseInt(r.FormValue("delay"), 0, 2000, 500) / 10
+		algorithm := parseOption(r.FormValue("algorithm"), []string{"dijkstra", "alt"}, "alt")
+
 		// Browsers ignore loop count field in gifs :(
-		drawShortestPath(w, src, dest, size, frames, delay)
+		drawShortestPath(w, src, dest, size, frames, delay, algorithm)
 	})
+
 	http.HandleFunc("/vertex", func(w http.ResponseWriter, r *http.Request) {
 		i, err := strconv.Atoi(r.FormValue("i"))
 		if err != nil {

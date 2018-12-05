@@ -6,6 +6,7 @@ function displaySearch() {
 	var dy = $('dest_lat').value;
 	var dx = -$('dest_long').value;
 	var frames = $('frames').value;
+	var algorithm = $('algorithm').value;
 
 	// TODO: cache coordinate lookups
 	var src = null;
@@ -25,7 +26,7 @@ function displaySearch() {
 			dest = parseInt(r['NodeId']);
 		}
 		if(src !== null && dest !== null) {
-			$('route_map').src = 'shortest-path?size=600&frames=' + frames + '&src=' + src + '&dest=' + dest;
+			$('route_map').src = 'shortest-path?size=600&frames=' + frames + '&src=' + src + '&dest=' + dest + '&algorithm=' + algorithm;
 		}
 	}
 
@@ -41,7 +42,7 @@ window.onload = function() {
 	initMap('a2');
 	initMap('michigan');
 
-	$('src_lat').onchange = $('src_long').onchange = $('dest_lat').onchange = $('dest_long').onchange = $('frames').onchange = displaySearch;
+	$('src_lat').onchange = $('src_long').onchange = $('dest_lat').onchange = $('dest_long').onchange = $('frames').onchange = $('algorithm').onchange = displaySearch;
 	displaySearch();
 }
 

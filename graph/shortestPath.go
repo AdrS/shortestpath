@@ -213,7 +213,7 @@ func SearchSequence(graph *Graph, src, dest int, potential PotentialFunc) ([]int
 		vistSeq = append(vistSeq, u)
 
 		if u == dest {
-			log.Printf("Found: %d, expected: %d\n", state.Nodes[u].Distance, Dijkstra(graph, src)[dest])
+			// log.Printf("Found: %d, expected: %d\n", state.Nodes[u].Distance, Dijkstra(graph, src)[dest])
 			break
 		}
 

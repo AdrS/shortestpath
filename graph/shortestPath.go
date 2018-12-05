@@ -3,6 +3,7 @@ package graph
 import (
 	"log"
 	"math"
+	"math/rand"
 )
 
 type NodeSearchState struct {
@@ -162,6 +163,8 @@ func NewSearchState(size int) *SearchState {
 	return &s
 }
 
+type PotentialFunc func(v int) int
+
 // Potential functions:
 // - function pi: V -> R
 // - transforms edge weights from w(u, v) -> w_{pi}(u, v) = w(u, v) - pi(u) + pi(v)
@@ -176,10 +179,23 @@ func NewSearchState(size int) *SearchState {
 //
 // Set all potentials to 0 to use Dijkstra's
 
+// Landmarks:
+// Triangle inequality d(a, b) + d(b, c) >= d(a,c)
+// For landmark L
+// - d(L, u) + d(u, v) >= d(L, v)
+//     => d(u, v) >= d(L, v) - d(L, u)
+// Improve lower bound:
+// - d(u, v) >= max{d(L, v) - d(L, u), d(v, L) - dist(u, L)}
+// - take maximum over multiple landmarks
+//
+// pi(v) = d(L, t) - d(L, v) is feasible
+// pf: l(u, v) - pi(u) + pi(v) = l(u, v) - d(L, t) + d(L, u) + d(L, t) - d(L, v)
+//      = d(L, u) + l(u, v) - d(L, v) >= 0 bc d(L, v) <= d(L, u) + l(u, v) by triangle inequality
+
 // Runs a shortest path algorithm from source to dest
 // and returns the reverse of the shortest path and
 // the sequence of vertices visited
-func SearchSequence(graph *Graph, src, dest int, potential []int) ([]int, []int) {
+func SearchSequence(graph *Graph, src, dest int, potential PotentialFunc) ([]int, []int) {
 	state := NewSearchState(len(graph.Nodes))
 	vistSeq := make([]int, 0)
 
@@ -192,6 +208,7 @@ func SearchSequence(graph *Graph, src, dest int, potential []int) ([]int, []int)
 		vistSeq = append(vistSeq, u)
 
 		if u == dest {
+			log.Printf("Dist: %d\n", state.Nodes[u].Distance)
 			break
 		}
 
@@ -200,7 +217,7 @@ func SearchSequence(graph *Graph, src, dest int, potential []int) ([]int, []int)
 		for _, dest := range graph.AdjacencyLists[u] {
 			v := dest.Dest
 			if !state.Nodes[v].Processed {
-				state.Relax(u, dest.Dest, dest.Dist+state.Nodes[u].Distance+potential[u])
+				state.Relax(u, dest.Dest, dest.Dist+state.Nodes[u].Distance+potential(u))
 			}
 		}
 	}
@@ -217,5 +234,58 @@ func SearchSequence(graph *Graph, src, dest int, potential []int) ([]int, []int)
 			shortestPath = append(shortestPath, src)
 		}
 	}
+
 	return shortestPath, vistSeq
+}
+
+// Computes distances from src vertex to every other vertex in graph
+func Dijkstra(graph *Graph, src int) []int {
+	state := NewSearchState(len(graph.Nodes))
+	vistSeq := make([]int, 0)
+
+	state.Relax(-1, src, 0)
+
+	for state.Len() != 0 {
+		// Find closest unprocessed reachable vertex
+		u := Pop(state)
+
+		vistSeq = append(vistSeq, u)
+
+		// Relax edges leaving u
+		state.Nodes[u].Processed = true
+		for _, dest := range graph.AdjacencyLists[u] {
+			v := dest.Dest
+			if !state.Nodes[v].Processed {
+				state.Relax(u, dest.Dest, dest.Dist+state.Nodes[u].Distance)
+			}
+		}
+	}
+	distances := make([]int, len(graph.Nodes))
+	for i, n := range state.Nodes {
+		distances[i] = n.Distance
+	}
+	return distances
+}
+
+// Picks n nodes to be landmarks
+func PickLandmarks(graph *Graph, n int) []int {
+	// Start with random selection
+	landmarks := make([]int, 0)
+	for i := 0; i < n; i++ {
+		landmarks = append(landmarks, rand.Intn(len(graph.Nodes)))
+	}
+	return landmarks
+}
+
+// Returns distance from landmark i to each vertex
+func DistancesFromLandmarks(graph *Graph, landmarks []int) [][]int {
+	distances := make([][]int, len(landmarks))
+	for i, landmark := range landmarks {
+		landmarkDistances := make([]int, len(graph.Nodes))
+		for j, d := range Dijkstra(graph, landmark) {
+			landmarkDistances[j] = d
+		}
+		distances[i] = landmarkDistances
+	}
+	return distances
 }

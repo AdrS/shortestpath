@@ -157,7 +157,25 @@ func drawCircle(img *image.Paletted, x0, y0, r int, c uint8) {
 func drawShortestPath(out io.Writer, src, dest, size, frames, delay int) {
 	// TODO: validate src and dest
 	// TODO: cache searches
-	shortestPath, searchSeq := graph.SearchSequence(roadNetwork, src, dest, dijkstraPotentials)
+	landmarkPotential := func(v int) int {
+		// max{d(L, t) - dist(L, v) for L in landmarks}
+		maxDist := 0
+		for _, distances := range landmarkDistances {
+			// Unreachable -> dont want to deal with underflow
+			if distances[dest] == math.MaxInt64 || distances[v] == math.MaxInt64 {
+				continue
+			}
+			dist := distances[dest] - distances[v]
+			if dist > maxDist {
+				maxDist = dist
+			}
+		}
+		return maxDist
+	}
+	shortestPath, searchSeq := graph.SearchSequence(roadNetwork, src, dest, landmarkPotential)
+
+	//dijkstraPotential := func(int) int { return 0 }
+	//shortestPath, searchSeq := graph.SearchSequence(roadNetwork, src, dest, dijkstraPotential)
 
 	// Determine bounds from search sequence
 	minLat, maxLat, minLong, maxLong := findCordinateRange(searchSeq, roadNetwork.Nodes)
@@ -222,7 +240,8 @@ func drawShortestPath(out io.Writer, src, dest, size, frames, delay int) {
 }
 
 var roadNetwork *graph.Graph
-var dijkstraPotentials []int
+var landmarks []int
+var landmarkDistances [][]int
 
 func setup(nodeFilePath, vertexFilePath string) {
 	log.Print("Loading graph...")
@@ -230,8 +249,10 @@ func setup(nodeFilePath, vertexFilePath string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	dijkstraPotentials = make([]int, len(g.Nodes))
+	log.Print("Picking landmarks...")
+	landmarks = graph.PickLandmarks(g, 1)
+	log.Print("Computing distances to landmarks...")
+	landmarkDistances = graph.DistancesFromLandmarks(g, landmarks)
 	roadNetwork = g
 }
 

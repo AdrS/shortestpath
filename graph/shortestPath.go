@@ -7,8 +7,10 @@ import (
 )
 
 type NodeSearchState struct {
-	// Length of shortest path (so far) to node
+	// Length of shortest path found (so far) from s
 	Distance int
+	// Estimate of distance from vertex to t (only needs to be computed once)
+	Potential int
 	// Predecessor of vertex on shortest path from s
 	Pred int
 	// Have all the edges from this vertex been relaxed yet
@@ -68,7 +70,9 @@ func (s *SearchState) Len() int {
 }
 
 func (s *SearchState) Less(a, b int) bool {
-	return s.Nodes[s.Heap[a]].Distance < s.Nodes[s.Heap[b]].Distance
+	u := s.Nodes[s.Heap[a]]
+	v := s.Nodes[s.Heap[b]]
+	return u.Distance+u.Potential <= v.Distance+v.Potential
 }
 
 func (s *SearchState) Swap(a, b int) {
@@ -155,6 +159,7 @@ func NewSearchState(size int) *SearchState {
 	for i := 0; i < size; i++ {
 		s.Nodes = append(s.Nodes, NodeSearchState{
 			Distance:  math.MaxInt64,
+			Potential: -1,
 			Pred:      -1,
 			Processed: false,
 			Idx:       -1,
@@ -217,7 +222,11 @@ func SearchSequence(graph *Graph, src, dest int, potential PotentialFunc) ([]int
 		for _, dest := range graph.AdjacencyLists[u] {
 			v := dest.Dest
 			if !state.Nodes[v].Processed {
-				state.Relax(u, dest.Dest, dest.Dist+state.Nodes[u].Distance+potential(u))
+				// Lazily compute potentials
+				if state.Nodes[v].Potential == -1 {
+					state.Nodes[v].Potential = potential(v)
+				}
+				state.Relax(u, v, state.Nodes[u].Distance+dest.Dist)
 			}
 		}
 	}

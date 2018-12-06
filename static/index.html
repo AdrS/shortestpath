@@ -20,28 +20,7 @@
 	</div>
 
 	<h2>Shortest Path</h2>
-	<div>
-		<img id="route_map" src="" />
-		<div>
-			Source:
-			<input type="number" value="42.2808" id="src_lat">° N
-			<input type="number" value="83.74" id="src_long">° W
-		</div>
-		<div>
-			Destination:
-			<input type="number" value="41.65" id="dest_lat">° N
-			<input type="number" value="83.53" id="dest_long">° W
-		</div>
-		<div>
-			Animation Frames:
-			<input type="number" min="1" max="120" value="15" id="frames">
-			Algorithm:
-			<select id="algorithm">
-				<option value="dijkstra">Dijkstra</option>
-				<option value="alt">ALT (A*, landmarks, triangle inequality)</option>
-			</select>
-		</div>
-	</div>
+	<div id="p2p-search"></div>
 <hr>
 Written by Adrian Stoll on 23 Nov 2018
 </body>

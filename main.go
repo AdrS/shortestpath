@@ -48,6 +48,8 @@ var palette = []color.Color{
 	color.RGBA{255, 0, 0, 255},     // Red
 	color.RGBA{0, 0, 255, 255},     // Blue
 	color.RGBA{255, 215, 0, 255},   // Gold
+	color.RGBA{0, 0x69, 0x94, 255}, // Water
+	color.RGBA{0, 0, 0, 255},       // Black
 	//color.RGBA{255, 128, 128, 255}, // Red
 	//color.RGBA{0, 128, 0, 255},     // Green
 }
@@ -55,9 +57,9 @@ var palette = []color.Color{
 const (
 	backgroundColor = 0
 	unvisitedColor  = 2
-	visitedColor    = 1
-	pathColor       = 4
-	landmarkColor   = 3
+	visitedColor    = 3
+	pathColor       = 7
+	landmarkColor   = 5
 )
 
 func makeMap(centerx, centery, radius, size int) *image.Paletted {

@@ -44,7 +44,7 @@ func pixelLocation(cord graph.Cord, minLat, minLong, radius, size int) (x, y int
 var palette = []color.Color{
 	color.RGBA{255, 255, 255, 255}, // White
 	color.RGBA{128, 128, 128, 255}, // Grey
-	color.RGBA{0, 255, 0, 255},     // Green
+	color.RGBA{11, 102, 35, 255},   // Green
 	color.RGBA{255, 0, 0, 255},     // Red
 	color.RGBA{0, 0, 255, 255},     // Blue
 	color.RGBA{255, 215, 0, 255},   // Gold
@@ -54,8 +54,8 @@ var palette = []color.Color{
 
 const (
 	backgroundColor = 0
-	unvisitedColor  = 1
-	visitedColor    = 5
+	unvisitedColor  = 2
+	visitedColor    = 1
 	pathColor       = 4
 	landmarkColor   = 3
 )
@@ -172,6 +172,12 @@ var searchCache map[string]*ShortestPathInfo
 
 func getShortestPath(src, dest int, algorithm string) *ShortestPathInfo {
 	// TODO: validate src and dest
+	key := fmt.Sprintf("%d%s%d", src, algorithm, dest)
+	// TODO: add mutex
+	result, ok := searchCache[key]
+	if ok {
+		return result
+	}
 
 	// Pick potential function based on search method
 	landmarkPotential := func(v int) int {
@@ -203,7 +209,7 @@ func getShortestPath(src, dest int, algorithm string) *ShortestPathInfo {
 	centerx := (minLong + maxLong) / 2
 	centery := (minLat + maxLat) / 2
 	radius := max(max(maxLong-minLong, maxLat-minLat)*11/20, 5e4)
-	return &ShortestPathInfo{
+	result = &ShortestPathInfo{
 		Src:          src,
 		Dest:         dest,
 		ShortestPath: shortestPath,
@@ -212,6 +218,9 @@ func getShortestPath(src, dest int, algorithm string) *ShortestPathInfo {
 		Centery:      centery,
 		Radius:       radius,
 	}
+	// TODO: evict if cache is too full
+	searchCache[key] = result
+	return result
 }
 
 // TODO: cache src, dst, algorithm -> results
@@ -293,6 +302,7 @@ func setup(nodeFilePath, vertexFilePath string) {
 	log.Print("Computing distances to landmarks...")
 	landmarkDistances = graph.DistancesFromLandmarks(g, landmarks)
 	roadNetwork = g
+	searchCache = make(map[string]*ShortestPathInfo)
 }
 
 // Parses integer, ensuring result is in [min, max]

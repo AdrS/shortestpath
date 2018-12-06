@@ -89,31 +89,34 @@ function makeDropdown(labels, values) {
 
 function initRouteMap(id) {
 	// Get initial parameters
-	var zoom = 1, xoffset = 0, yoffset = 0;
-	var currentScale = 1;
+	var currentScale = 1, xoffset = 0, yoffset = 0;
 
 	function refresh() {
-		console.log("TODO: write refresh");
 		var sy = $(id + '_src_lat').value;
 		var sx = -$(id + '_src_long').value;
 		var dy = $(id + '_dest_lat').value;
 		var dx = -$(id + '_dest_long').value;
 
-		img.src = 'shortest-path?size=600&frames=' + frameInput.value + '&src=' + sy + ',' + sx + '&dest=' + dy + ',' + dx + '&algorithm=' + algorithmInput.value + '&zoom=' + zoom + '&xoffset=' + xoffset + '&yoffset=' + yoffset;
+		img.src = 'shortest-path?size=600&frames=' + frameInput.value + '&src=' + sy + ',' + sx + '&dest=' + dy + ',' + dx + '&algorithm=' + algorithmInput.value + '&zoom=' + currentScale + '&xoffset=' + xoffset + '&yoffset=' + yoffset;
 
-		// TODO: adjust size based on screen
-		// TODO: resize images when browser window changes
 	}
 
-	function zoomIn(ratio) {
-		zoom *= ratio
+	function zoom(ratio) {
+		currentScale *= ratio
+		refresh();
+	}
+
+	function search() {
+		currentScale = 1;
+		xoffset = 0;
+		yoffset = 0;
 		refresh();
 	}
 
 	// Units are multiples of currentScale
 	function pan(x, y) {
-		xoffset += x*currentScale;
-		yoffset += y*currentScale;
+		xoffset += x/currentScale;
+		yoffset += y/currentScale;
 		refresh();
 	}
 
@@ -128,35 +131,34 @@ function initRouteMap(id) {
 	controls.appendChild(makeButton('Right', function() { pan(0.25, 0); }));
 	controls.appendChild(makeButton('Up', function() { pan(0, 0.25); }));
 	controls.appendChild(makeButton('Down', function() { pan(0, -0.25); }));
-	controls.appendChild(makeButton('+', function() { zoomIn(1/0.75); }))
-	controls.appendChild(makeButton('-', function() { zoomIn(0.75); }))
+	controls.appendChild(makeButton('+', function() { zoom(1/0.75); }))
+	controls.appendChild(makeButton('-', function() { zoom(0.75); }))
+	div.appendChild(controls)
 
 	// Search box controls
-	var search = document.createElement('div');
-	search.appendChild(makeLocationEntry('Source: ', '42.2808', '83.74', id + '_src', refresh));
-	search.appendChild(makeLocationEntry('Destination: ', '41.65', '83.53', id + '_dest', refresh));
+	controls = document.createElement('div');
+	controls.appendChild(makeLocationEntry('Source: ', '42.2808', '83.74', id + '_src', search));
+	controls.appendChild(makeLocationEntry('Destination: ', '41.65', '83.53', id + '_dest', search));
+	div.appendChild(controls)
 
 	// Frame and animation controls
-	var animation = document.createElement('div');
+	controls = document.createElement('div');
 
 	// Number of frames input
-	animation.append(document.createTextNode('Frames: '));
+	controls.append(document.createTextNode('Frames: '));
 	var frameInput = document.createElement('input');
 	frameInput.type = 'number';
 	frameInput.min = 1;
 	frameInput.max = 120;
 	frameInput.value = 15;
 	frameInput.onchange = refresh;
-	animation.appendChild(frameInput);
+	controls.appendChild(frameInput);
 
 	// Algorithm controls
-	animation.append(document.createTextNode('Algorithm: '));
+	controls.append(document.createTextNode('Algorithm: '));
 	var algorithmInput = makeDropdown(['Dijkstra', 'ALT (A*, landmarks, triangle inequality)'], ['dijkstra', 'alt']);
 	algorithmInput.onchange = refresh;
-	animation.append(algorithmInput)
-
-	div.appendChild(controls)
-	div.appendChild(search);
-	div.appendChild(animation)
-	refresh();
+	controls.append(algorithmInput)
+	div.appendChild(controls);
+	search();
 }

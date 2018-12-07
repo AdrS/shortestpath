@@ -97,7 +97,7 @@ function initRouteMap(id) {
 		var dy = $(id + '_dest_lat').value;
 		var dx = -$(id + '_dest_long').value;
 
-		img.src = 'shortest-path?size=600&frames=' + frameInput.value + '&src=' + sy + ',' + sx + '&dest=' + dy + ',' + dx + '&algorithm=' + algorithmInput.value + '&zoom=' + currentScale + '&xoffset=' + xoffset + '&yoffset=' + yoffset;
+		img.src = 'shortest-path?size=' + sizeInput.value +'&frames=' + frameInput.value + '&src=' + sy + ',' + sx + '&dest=' + dy + ',' + dx + '&algorithm=' + algorithmInput.value + '&zoom=' + currentScale + '&xoffset=' + xoffset + '&yoffset=' + yoffset;
 
 	}
 
@@ -153,6 +153,16 @@ function initRouteMap(id) {
 	frameInput.value = 15;
 	frameInput.onchange = refresh;
 	controls.appendChild(frameInput);
+
+	// Image size
+	controls.append(document.createTextNode('Size: '));
+	var sizeInput = document.createElement('input');
+	sizeInput.type = 'number';
+	sizeInput.min = 100;
+	sizeInput.max = 2000;
+	sizeInput.value = 600;
+	sizeInput.onchange = refresh;
+	controls.appendChild(sizeInput);
 
 	// Algorithm controls
 	controls.append(document.createTextNode('Algorithm: '));

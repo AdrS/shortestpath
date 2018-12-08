@@ -366,10 +366,15 @@ func parseCords(s string, xmin, xmax, ymin, ymax, xd, yd float64) graph.Cord {
 }
 
 func main() {
-	if len(os.Args) != 3 {
-		fmt.Fprintf(os.Stderr, "usage: %s <node file> <vertex file>\n", os.Args[0])
+	if len(os.Args) != 3 && len(os.Args) != 4 {
+		fmt.Fprintf(os.Stderr, "usage: %s <node file> <vertex file> <port>\n", os.Args[0])
 		os.Exit(1)
 	}
+	port := 8888
+	if len(os.Args) == 4 {
+		port = parseInt(os.Args[3], 1, (1<<16)-1, 8888)
+	}
+
 	rand.Seed(42)
 	setup(os.Args[1], os.Args[2])
 	http.Handle("/", http.FileServer(http.Dir("static")))
@@ -441,5 +446,5 @@ func main() {
 		fmt.Fprintf(w, "{\"Lat\": %d, \"Long\": %d, \"NodeId\": %d}", lat, long, id)
 	})
 	log.Print("Starting server...")
-	log.Fatal(http.ListenAndServe("localhost:8888", nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("localhost:%d", port), nil))
 }
